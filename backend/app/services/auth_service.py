@@ -467,18 +467,12 @@ def authenticate_user(
             if institute.is_suspended:
                 raise InstituteSuspendedError()
     
-    old_session_jti = _get_session(str(user.id))
-    if old_session_jti:
-        _blacklist_token(old_session_jti, SESSION_TTL)
-    
     tokens = _generate_tokens(
         user_id=str(user.id),
         email=user.email,
         role=user.role,
         institute_id=institute_id,
     )
-    
-    _store_session(str(user.id), tokens["access_jti"])
     
     user.last_login_at = datetime.now(timezone.utc)
     user.save()
@@ -598,18 +592,12 @@ def authenticate_google(
         if institute and institute.is_suspended:
             raise InstituteSuspendedError()
     
-    old_session_jti = _get_session(str(user.id))
-    if old_session_jti:
-        _blacklist_token(old_session_jti, SESSION_TTL)
-    
     tokens = _generate_tokens(
         user_id=str(user.id),
         email=user.email,
         role=user.role,
         institute_id=institute_id,
     )
-    
-    _store_session(str(user.id), tokens["access_jti"])
     
     user.last_login_at = datetime.now(timezone.utc)
     user.save()
@@ -664,10 +652,6 @@ def refresh_access_token(refresh_token: str) -> Dict[str, Any]:
     if _is_blacklisted(jti):
         raise InvalidTokenError("Token has been revoked")
     
-    session_jti = _get_session(user_id)
-    if session_jti and session_jti != jti:
-        raise InvalidTokenError("Session invalidated")
-    
     from app.models import User, Institute
     
     user = User.objects(id=user_id).first()
@@ -686,8 +670,6 @@ def refresh_access_token(refresh_token: str) -> Dict[str, Any]:
     )
     
     _blacklist_token(jti, 7 * 24 * 3600)
-    
-    _store_session(user_id, tokens["access_jti"])
     
     logger.info(f"Token refreshed for user: {user.email}")
     
